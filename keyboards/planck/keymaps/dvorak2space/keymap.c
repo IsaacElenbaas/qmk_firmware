@@ -7,20 +7,31 @@
 #define CAD LCTL(LALT(KC_DEL))
 
 #define BASE_L  0
-#define SHFT_L  1
-#define MOD_L   2
-#define NAV_L   3
-#define AHK_L   4
-#define LOCK_L  5
-#define PASS_L  6
+#define SHFT_R  1
+#define SHFT_L  2
+#define MOD_L   3
+#define NAV_L   4
+#define AHK_L   5
+#define LOCK_L  6
+#define PASS_L  7
 
 static host_driver_t *host_driver = 0;
 
+int holdShift = 0;
+bool macMode = false;
+
 enum {
   HK_SLP = SAFE_RANGE,
+  HK_FSLP,
   HK_IF,
   HK_ELSE,
-  HK_COSL
+  HK_COSL,
+  LT_OFF,
+  LT_ON,
+  MD_PREV,
+  MD_PAUSE,
+  MD_NEXT,
+  MM_TOGGLE
 };
 
 enum {
@@ -59,9 +70,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_LSFT, KC_SCLN,KC_Q,    KC_J,    KC_K,    KC_X,    KC_B,    KC_M,    KC_W,    KC_V,    KC_Z,    KC_RSFT,
     KC_ESC,  MOUSER, MOUSEL,  KC_LCTL,          KC_SPC,  MO(MOD_L),        KC_LGUI, KC_VOLD, KC_VOLU, OSL(AHK_L)
   ),
-/* Custom Shifts
+/* Custom Right Shift
  * ,-----------------------------------------------------------------------------------.
- * |      |      |   ?  |   !  |      |      |      |      |      |      |      |      |
+ * |      |      |   ?  |   !  |      |      |      |      |      |      |      |  DEL |
  * |------+------+------+------+------+-------------+------+------+------+------+------|
  * |      |      |      |      |      |      |      |      |      |      |      |      |
  * |------+------+------+------+------+------|------+------+------+------+------+------|
@@ -71,10 +82,27 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
  * `-----------------------------------------------------------------------------------'
  */
   [1] = LAYOUT_planck_2x2u(
-    KC_TRNS,KC_TRNS,KC_SLSH,KC_1,   KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
+    KC_TRNS,KC_TRNS,KC_SLSH,KC_1,   KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_DEL,
     KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
     KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
     KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,        KC_TRNS,KC_NO,          KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS
+  ),
+/* Custom Left Shift
+ * ,-----------------------------------------------------------------------------------.
+ * |  INS |      |      |      |      |      |      |      |      |      |      |      |
+ * |------+------+------+------+------+-------------+------+------+------+------+------|
+ * |      |      |      |      |      |      |      |      |      |      |      |      |
+ * |------+------+------+------+------+------|------+------+------+------+------+------|
+ * |      |      |      |      |      |      |      |      |      |      |      |      |
+ * |------+------+------+------+------+------+------+------+------+------+------+------|
+ * |      |      |      |  ALT |             |             |      |      |      |      |
+ * `-----------------------------------------------------------------------------------'
+ */
+  [2] = LAYOUT_planck_2x2u(
+    KC_INS, KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
+    KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
+    KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS,
+    KC_TRNS,KC_TRNS,KC_TRNS,KC_LALT,        KC_TRNS,KC_NO,          KC_TRNS,KC_TRNS,KC_TRNS,KC_TRNS
   ),
 /* Modifier
  * ,-----------------------------------------------------------------------------------.
@@ -84,38 +112,38 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
  * |------+------+------+------+------+------|------+------+------+------+------+------|
  * |   `  |   <  |   >  |   &  |   |  |   _  |   $  |   @  |   #  |   %  |   ^  |   ~  |
  * |------+------+------+------+------+------+------+------+------+------+------+------|
- * |      |      |      |      |    Space    |             |      |      |      |      |
+ * |      |      |      |   .  |    Space    |             |      |      |      |      |
  * `-----------------------------------------------------------------------------------'
  */
-  [2] = LAYOUT_planck_2x2u(
+  [3] = LAYOUT_planck_2x2u(
     KC_TRNS,KC_PLUS,TD(DSH),KC_ASTR,TD(FB), HK_IF,  HK_ELSE,TD(LPN),TD(RPN),KC_LCBR,KC_RCBR,KC_TRNS,
     KC_EQL, KC_1,   KC_2,   KC_3,   KC_4,   KC_5,   KC_6,   KC_7,   KC_8,   KC_9,   KC_0,   KC_TRNS,
     KC_GRV, KC_LT,  KC_GT,  KC_AMPR,KC_PIPE,KC_UNDS,KC_DLR, KC_AT,  KC_HASH,KC_PERC,KC_CIRC,LSFT(KC_GRV),
-    KC_NO,  KC_NO,  KC_NO,  KC_NO,          KC_SPC, KC_TRNS,        KC_NO,  KC_NO,  KC_NO,  KC_NO
+    KC_NO,  KC_NO,  KC_NO,  KC_DOT,         KC_SPC, KC_TRNS,        KC_NO,  KC_NO,  KC_NO,  KC_NO
   ),
 //Nav
-  [3] = LAYOUT_planck_2x2u(
+  [4] = LAYOUT_planck_2x2u(
     KC_TRNS,KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_HOME,KC_UP,  KC_END,  KC_NO,  KC_TRNS,
     KC_TRNS,KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  CTRLL,  KC_LEFT,KC_DOWN,KC_RGHT, CTRLR,  KC_TRNS,
     KC_LSFT,KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,   KC_NO,  KC_NO,
     KC_NO,  KC_NO,  KC_NO,  KC_NO,          KC_SPC, KC_NO,          KC_NO,  KC_NO,   KC_NO,  KC_NO
   ),
-//AHK-Bindable Macros
-  [4] = LAYOUT_planck_2x2u(
-    KC_F13,      KC_F14,      KC_F15,      KC_F16,      KC_F17,      KC_F18,      KC_F19,      KC_F20,      KC_F21,      KC_F22,      KC_F23,      KC_F24,
-    LCTL(KC_F13),LCTL(KC_F14),LCTL(KC_F15),LCTL(KC_F16),LCTL(KC_F17),LCTL(KC_F18),LCTL(KC_F19),LCTL(KC_F20),LCTL(KC_F21),LCTL(KC_F22),LCTL(KC_F23),LCTL(KC_F24),
-    LSFT(KC_F13),LSFT(KC_F14),LSFT(KC_F15),LSFT(KC_F16),LSFT(KC_F17),LSFT(KC_F18),LSFT(KC_F19),LSFT(KC_F20),LSFT(KC_F21),LSFT(KC_F22),LSFT(KC_F23),LSFT(KC_F24),
+//Macros
+  [5] = LAYOUT_planck_2x2u(
+    LT_OFF,      KC_F14,      KC_F15,      KC_F16,      KC_F17,      KC_F18,      KC_F19,      KC_F20,      KC_F21,      KC_F22,      KC_F23,      LT_ON,
+    LCTL(KC_F13),MD_PREV,     MD_PAUSE,    MD_NEXT,     LCTL(KC_F17),LCTL(KC_F18),LCTL(KC_F19),LCTL(KC_F20),LCTL(KC_F21),LCTL(KC_F22),LCTL(KC_F23),LCTL(KC_F24),
+    LSFT(KC_F13),LSFT(KC_F14),LSFT(KC_F15),LSFT(KC_F16),LSFT(KC_F17),LSFT(KC_F18),MM_TOGGLE,   HK_FSLP,     LSFT(KC_F21),LSFT(KC_F22),LSFT(KC_F23),LSFT(KC_F24),
     RESET,       LALT(KC_F14),LALT(KC_F15),OSL(PASS_L),              CAD,         LALT(KC_F19),             LALT(KC_F21),LALT(KC_F22),HK_SLP,      HK_COSL
   ),
 //Locked Screen
-  [5] = LAYOUT_planck_2x2u(
+  [6] = LAYOUT_planck_2x2u(
     KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,
     KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,
     KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_NO,
     KC_NO,  KC_NO,  KC_NO,  KC_NO,          KC_NO,  KC_NO,          KC_NO,  KC_NO,  HK_SLP, KC_NO
   ),
 //Passwords (by first letter of service name, at least better than just one)
-  [6] = LAYOUT_planck_2x2u(
+  [7] = LAYOUT_planck_2x2u(
     KC_NO,  KC_NO,  KC_NO,  KC_NO,  KC_P,    KC_Y,    KC_F,    KC_G,    KC_C,    KC_R,    KC_L,    KC_NO,
     KC_NO,  KC_A,   KC_O,   KC_E,   KC_U,    KC_I,    KC_D,    KC_H,    KC_T,    KC_N,    KC_S,    KC_NO,
     KC_NO,  KC_NO,  KC_Q,   KC_J,   KC_K,    KC_X,    KC_B,    KC_M,    KC_W,    KC_V,    KC_Z,    KC_NO,
@@ -125,18 +153,61 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) { //X_KEY doesn't support aliases
   switch(keycode) {
-    //if shift pressed and not shift layer or released and other shift not pressed
-    //in separate things because MOD_BIT (probably?) isn't toggled until after this returns true and shift is actually toggled
-    case KC_LSFT: //if pressed and not shift layer or released and other shift not pressed
-      if((record->event.pressed && IS_LAYER_OFF(SHFT_L)) || (!record->event.pressed && !(get_mods() & MOD_BIT(KC_RSFT)))) { layer_invert(SHFT_L); }
+    //pressing both shifts at the same time will hold down last pressed shift until another is pressed
+    case KC_LSFT:
+      if(record->event.pressed) {
+        if(IS_LAYER_OFF(SHFT_L)) {
+          layer_invert(SHFT_L);
+        }
+        if(holdShift) { //would be impossible on release without recording physical state of key
+          if(IS_LAYER_ON(SHFT_R)) {
+            layer_invert(SHFT_R);
+          }
+          unregister_mods(MOD_BIT(KC_RSFT));
+        }
+        holdShift = 0;
+        if(get_mods() & MOD_BIT(KC_RSFT)) {
+          holdShift = 2;
+        }
+      }
+      else {
+        if(holdShift == 2) {
+          return false;
+        }
+        else {
+          layer_invert(SHFT_L);
+        }
+      }
       break;
     case KC_RSFT:
-      if((record->event.pressed && IS_LAYER_OFF(SHFT_L)) || (!record->event.pressed && !(get_mods() & MOD_BIT(KC_LSFT)))) { layer_invert(SHFT_L); }
+      if(record->event.pressed) {
+        if(IS_LAYER_OFF(SHFT_R)) {
+          layer_invert(SHFT_R);
+        }
+        if(holdShift) {
+          if(IS_LAYER_ON(SHFT_L)) {
+            layer_invert(SHFT_L);
+          }
+          unregister_mods(MOD_BIT(KC_LSFT));
+        }
+        holdShift = 0;
+        if(get_mods() & MOD_BIT(KC_LSFT)) {
+          holdShift = 1;
+        }
+      }
+      else {
+        if(holdShift == 1) {
+          return false;
+        }
+        else {
+          layer_invert(SHFT_R);
+        }
+      }
       break;
     case KC_ENT: //won't repeat on hold and I can't find a solution other than hardcoding timers but I kinda prefer it anyway. Swaps enter and shift enter
       if(record->event.pressed) {
-        (IS_LAYER_ON(SHFT_L)) //if shifted release correct shift, send, and press same shift, else send shift enter
-          ? (get_mods() & MOD_BIT(KC_LSFT))
+        (holdShift) //if shifted release correct shift, send, and press same shift, else send shift enter
+          ? (IS_LAYER_ON(SHFT_L))
             ? SEND_STRING(SS_UP(X_LSHIFT) SS_TAP(X_ENTER) SS_DOWN(X_LSHIFT))
             : SEND_STRING(SS_UP(X_RSHIFT) SS_TAP(X_ENTER) SS_DOWN(X_RSHIFT))
           : SEND_STRING(SS_LSFT(SS_TAP(X_ENTER)));
@@ -151,16 +222,90 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) { //X_KEY doesn'
     case HK_COSL:
       clear_keyboard();
       break;
+    case KC_VOLU:
+      if(!macMode) {
+        break;
+      }
+      else {
+        tap_code(KC__VOLUP);
+        return false;
+      }
+    case KC_VOLD:
+      if(!macMode) {
+        break;
+      }
+      else {
+        tap_code(KC__VOLDOWN);
+        return false;
+      }
+    case LT_OFF:
+      if(!macMode) {
+        tap_code(KC_F13);
+        break;
+      }
+      else {
+        tap_code(KC_BRMD);
+        return false;
+      }
+    case LT_ON:
+      if(!macMode) {
+        tap_code(KC_F24);
+        break;
+      }
+      else {
+        tap_code(KC_BRMU);
+        return false;
+      }
+    case MD_PREV:
+      if(!macMode) {
+        SEND_STRING(SS_LCTRL(SS_TAP(X_F14)));
+      }
+      else {
+        tap_code(KC_MEDIA_REWIND);
+      }
+      break;
+    case MD_PAUSE:
+      if(!macMode) {
+        SEND_STRING(SS_LCTRL(SS_TAP(X_F15)));
+      }
+      else {
+        tap_code(KC_MEDIA_PLAY_PAUSE);
+      }
+      break;
+    case MD_NEXT:
+      if(!macMode) {
+        SEND_STRING(SS_LCTRL(SS_TAP(X_F16)));
+      }
+      else {
+        tap_code(KC_MEDIA_FAST_FORWARD);
+      }
+      break;
+    case MM_TOGGLE:
+      macMode = !macMode;
+      break;
+    case HK_FSLP:
+      layer_invert(LOCK_L);
+      break;
     case HK_SLP:
       if(record->event.pressed) {
         if(IS_LAYER_OFF(LOCK_L)) {
           host_driver = host_get_driver();
-          SEND_STRING(SS_LALT(SS_TAP(X_F23)));
+          if(!macMode) {
+            SEND_STRING(SS_LALT(SS_TAP(X_F23)));
+          }
+          else {
+            SEND_STRING(SS_LSFT(SS_LCTRL(SS_TAP(X_POWER))));
+          }
           host_set_driver(0);
         }
         else {
           host_set_driver(host_driver);
-          SEND_STRING(SS_LALT(SS_TAP(X_F24)));
+          if(!macMode) {
+            SEND_STRING(SS_LALT(SS_TAP(X_F24)));
+          }
+          else {
+            tap_code(KC_POWER);
+          }
         }
         return false;
       }
@@ -220,12 +365,21 @@ void dash_finished(qk_tap_dance_state_t *state, void *user_data) {
       tap_code(KC_PMNS);
       break;
     case SINGLE_HOLD:
-      register_mods(MOD_BIT(KC_LALT));
-      tap_code(KC_KP_0);
-      tap_code(KC_KP_1);
-      tap_code(KC_KP_5);
-      tap_code(KC_KP_1);
-      unregister_mods(MOD_BIT(KC_LALT));
+      if(!macMode) {
+        register_mods(MOD_BIT(KC_LALT));
+        tap_code(KC_KP_0);
+        tap_code(KC_KP_1);
+        tap_code(KC_KP_5);
+        tap_code(KC_KP_1);
+        unregister_mods(MOD_BIT(KC_LALT));
+      }
+      else {
+        register_mods(MOD_BIT(KC_LSFT));
+        register_mods(MOD_BIT(KC_LALT));
+        tap_code(KC_MINUS);
+        unregister_mods(MOD_BIT(KC_LALT));
+        unregister_mods(MOD_BIT(KC_LSFT));
+      }
       break;
     case DOUBLE_TAP:
       tap_code(KC_PMNS);
