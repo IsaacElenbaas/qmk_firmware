@@ -206,7 +206,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) { //X_KEY doesn'
       break;
     case KC_ENT: //won't repeat on hold and I can't find a solution other than hardcoding timers but I kinda prefer it anyway. Swaps enter and shift enter
       if(record->event.pressed) {
-        (holdShift) //if shifted release correct shift, send, and press same shift, else send shift enter
+        (get_mods() & (MOD_BIT(KC_LSFT) | MOD_BIT(KC_LSFT))) //if shifted release correct shift, send, and press same shift, else send shift enter
           ? (IS_LAYER_ON(SHFT_L))
             ? SEND_STRING(SS_UP(X_LSHIFT) SS_TAP(X_ENTER) SS_DOWN(X_LSHIFT))
             : SEND_STRING(SS_UP(X_RSHIFT) SS_TAP(X_ENTER) SS_DOWN(X_RSHIFT))
