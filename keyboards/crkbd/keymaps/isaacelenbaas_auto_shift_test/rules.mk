@@ -1,0 +1,2 @@
+EXTRAKEY_ENABLE  = yes # +450
+AUTO_SHIFT_ENABLE = yes

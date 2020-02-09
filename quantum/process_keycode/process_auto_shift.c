@@ -20,19 +20,18 @@
 
 #    include "process_auto_shift.h"
 
-#    define TAP(key)        \
-        register_code(key); \
-        unregister_code(key)
+static bool autoshift_enabled = true;
+static uint16_t autoshift_time    = 0;
+static uint16_t autoshift_timeout = AUTO_SHIFT_TIMEOUT;
+static int16_t autoshift_lastkey = -1; // -1 is what KC_NO was before - 'not currently autoshifting'.
+static int16_t autoshift_lastkey_shifted = -2; // set in the top of process_auto_shift.
+// process_custom_shifts return values:
+// -2 - not a custom autoshift key
+// -1 - custom key, use default shifted value
+// 0 = KC_NO, allowing for keys to not have an action when held.
+// other - the code to send when timeout exceeded.
 
-#    define TAP_WITH_MOD(mod, key) \
-        register_code(mod);        \
-        register_code(key);        \
-        unregister_code(key);      \
-        unregister_code(mod)
-
-uint16_t autoshift_time    = 0;
-uint16_t autoshift_timeout = AUTO_SHIFT_TIMEOUT;
-uint16_t autoshift_lastkey = KC_NO;
+__attribute__((weak)) int16_t autoshift_custom_shifts(uint16_t keycode, keyrecord_t *record) { return -2; }
 
 void autoshift_timer_report(void) {
     char display[8];
@@ -42,32 +41,39 @@ void autoshift_timer_report(void) {
     send_string((const char *)display);
 }
 
-void autoshift_on(uint16_t keycode) {
-    autoshift_time    = timer_read();
+bool autoshift_on(uint16_t keycode) {
+    if (!autoshift_enabled) { return true; }
+#    ifndef AUTO_SHIFT_MODIFIERS
+    if (get_mods()) {
+        return true;
+    }
+#    endif
+    autoshift_time = timer_read();
     autoshift_lastkey = keycode;
+
+    // We need some extra handling here for OSL edge cases
+#    if !defined(NO_ACTION_ONESHOT) && !defined(NO_ACTION_TAPPING)
+    clear_oneshot_layer_state(ONESHOT_OTHER_KEY_PRESSED);
+#    endif
+    return false;
 }
 
 void autoshift_flush(void) {
-    if (autoshift_lastkey != KC_NO) {
+    if (autoshift_lastkey != -1) {
         uint16_t elapsed = timer_elapsed(autoshift_time);
 
         if (elapsed > autoshift_timeout) {
-            register_code(KC_LSFT);
+            tap_code16((autoshift_lastkey_shifted == -1) ? LSFT(autoshift_lastkey) : autoshift_lastkey_shifted);
+        }
+        else {
+            tap_code(autoshift_lastkey);
         }
 
-        register_code(autoshift_lastkey);
-        unregister_code(autoshift_lastkey);
-
-        if (elapsed > autoshift_timeout) {
-            unregister_code(KC_LSFT);
-        }
-
-        autoshift_time    = 0;
-        autoshift_lastkey = KC_NO;
+        autoshift_time = 0;
+        autoshift_lastkey = -1;
+        // no need to reset shifted
     }
 }
-
-bool autoshift_enabled = true;
 
 void autoshift_enable(void) { autoshift_enabled = true; }
 void autoshift_disable(void) {
@@ -84,114 +90,58 @@ void autoshift_toggle(void) {
     }
 }
 
-bool autoshift_state(void) { return autoshift_enabled; }
+bool get_autoshift_state(void) { return autoshift_enabled; }
+
+uint16_t get_autoshift_timeout(void) { return autoshift_timeout; }
+
+void set_autoshift_timeout(uint16_t timeout) { autoshift_timeout = timeout; }
 
 bool process_auto_shift(uint16_t keycode, keyrecord_t *record) {
-#    ifndef AUTO_SHIFT_MODIFIERS
-    static uint8_t any_mod_pressed;
-#    endif
-
+    autoshift_flush();
     if (record->event.pressed) {
+        autoshift_lastkey_shifted = autoshift_custom_shifts(keycode, record);
+        if (autoshift_lastkey_shifted > -2) {
+            return autoshift_on(keycode);
+        }
+        else {
+            autoshift_lastkey_shifted = LSFT(autoshift_lastkey);
+        }
         switch (keycode) {
             case KC_ASUP:
                 autoshift_timeout += 5;
-                return false;
-
+                return true;
             case KC_ASDN:
                 autoshift_timeout -= 5;
-                return false;
-
+                return true;
             case KC_ASRP:
                 autoshift_timer_report();
-                return false;
-
+                return true;
             case KC_ASTG:
                 autoshift_toggle();
-                return false;
+                return true;
             case KC_ASON:
                 autoshift_enable();
-                return false;
+                return true;
             case KC_ASOFF:
                 autoshift_disable();
-                return false;
+                return true;
 
 #    ifndef NO_AUTO_SHIFT_ALPHA
-            case KC_A:
-            case KC_B:
-            case KC_C:
-            case KC_D:
-            case KC_E:
-            case KC_F:
-            case KC_G:
-            case KC_H:
-            case KC_I:
-            case KC_J:
-            case KC_K:
-            case KC_L:
-            case KC_M:
-            case KC_N:
-            case KC_O:
-            case KC_P:
-            case KC_Q:
-            case KC_R:
-            case KC_S:
-            case KC_T:
-            case KC_U:
-            case KC_V:
-            case KC_W:
-            case KC_X:
-            case KC_Y:
-            case KC_Z:
+            case KC_A ... KC_Z:
 #    endif
 #    ifndef NO_AUTO_SHIFT_NUMERIC
-            case KC_1:
-            case KC_2:
-            case KC_3:
-            case KC_4:
-            case KC_5:
-            case KC_6:
-            case KC_7:
-            case KC_8:
-            case KC_9:
-            case KC_0:
+            case KC_1 ... KC_0:
 #    endif
 #    ifndef NO_AUTO_SHIFT_SPECIAL
-            case KC_MINUS:
-            case KC_EQL:
             case KC_TAB:
-            case KC_LBRC:
-            case KC_RBRC:
-            case KC_BSLS:
-            case KC_SCLN:
-            case KC_QUOT:
-            case KC_COMM:
-            case KC_DOT:
-            case KC_SLSH:
-            case KC_GRAVE:
+            case KC_MINUS ... KC_SLASH:
             case KC_NONUS_BSLASH:
-            case KC_NONUS_HASH:
 #    endif
-
-                autoshift_flush();
-                if (!autoshift_enabled) return true;
-
-#    ifndef AUTO_SHIFT_MODIFIERS
-                any_mod_pressed = get_mods() & (MOD_BIT(KC_LGUI) | MOD_BIT(KC_RGUI) | MOD_BIT(KC_LALT) | MOD_BIT(KC_RALT) | MOD_BIT(KC_LCTL) | MOD_BIT(KC_RCTL) | MOD_BIT(KC_LSFT) | MOD_BIT(KC_RSFT));
-
-                if (any_mod_pressed) {
-                    return true;
-                }
-#    endif
-
-                autoshift_on(keycode);
-                return false;
+                return autoshift_on(keycode);
 
             default:
-                autoshift_flush();
                 return true;
         }
-    } else {
-        autoshift_flush();
     }
 
     return true;
